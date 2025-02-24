@@ -1,0 +1,6 @@
+[submodule "libs/zli"]
+	path = libs/zli
+	url = https://github.com/TSxo/zli
+[submodule "libs/tigerbeetle"]
+	path = libs/tigerbeetle
+	url = https://github.com/tigerbeetle/tigerbeetle
