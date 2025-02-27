@@ -6,11 +6,11 @@
     //
     // It is redundant to include "zig" in this name because it is already
     // within the Zig package namespace.
-    .name = "mesh",
+    .name = "tb_client",
 
     // This is a [Semantic Version](https://semver.org/).
     // In a future version of Zig it will be used for package deduplication.
-    .version = "0.0.0",
+    .version = "1.0.0",
 
     // This field is optional.
     // This is currently advisory only; Zig does not yet do anything
@@ -22,12 +22,7 @@
     // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
-    .dependencies = .{
-        .zzz = .{
-            .url = "git+https://github.com/mookums/zzz#f8f64d29d62a0b0ef07d0ac500c4bf8af0c778b7",
-            .hash = "1220f44c593f4cfb286aead47539769384cca54cefa3c041d482da772adac3aa7e25",
-        },
-    },
+    .dependencies = .{},
     .paths = .{
         "build.zig",
         "build.zig.zon",

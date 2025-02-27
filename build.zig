@@ -129,28 +129,21 @@ pub fn build(b: *std.Build) !void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{
-        .name = "mesh",
-        .root_source_file = b.path("src/main.zig"),
+    // const exe = b.addExecutable(.{
+    //     .name = "mesh",
+    //     .root_source_file = b.path("src/main.zig"),
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    const lib = b.addStaticLibrary(.{
+        .name = "tb_client_zig",
+        // In this case the main source file is merely a path, however, in more
+        // complicated build scripts, this could be a generated file.
+        .root_source_file = b.path("src/client.zig"),
         .target = target,
         .optimize = optimize,
     });
-    const xev = b.dependency("zzz", .{ .target = target, .optimize = optimize });
-    exe.root_module.addImport("zzz", xev.module("zzz"));
 
-    const module = b.addModule("zli", .{
-        .root_source_file = .{ .cwd_relative = "./libs/zli/src/zli.zig" },
-    });
-    exe.root_module.addImport("zli", module);
-
-    // const vsr = b.addModule("vsr", .{
-    //     .root_source_file = b.path("./libs/tigerbeetle/src/vsr.zig"),
-    // });
-    // const vsr_options = b.addModule("vsr_options", .{
-    //     .root_source_file = b.path("./libs/tigerbeetle/src/vsr.zig"),
-    // });
-    //
-    // exe.root_module.addImport("vsr", vsr);
     const vsr_options, const vsr_module = build_vsr_module(b, .{
         .target = target,
         .git_commit = build_options.git_commit[0..40].*,
@@ -167,37 +160,38 @@ pub fn build(b: *std.Build) !void {
     tb.addImport("vsr", vsr_module);
     tb.addOptions("vsr_options", vsr_options);
 
-    exe.root_module.addImport("tb", tb);
-    exe.root_module.addImport("vsr", vsr_module);
-    exe.root_module.addOptions("vsr_options", vsr_options);
+    lib.root_module.addImport("tb", tb);
+    lib.root_module.addImport("vsr", vsr_module);
+    lib.root_module.addOptions("vsr_options", vsr_options);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
-    b.installArtifact(exe);
+    // b.installArtifact(exe);
+    b.installArtifact(lib);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
     // such a dependency.
-    const run_cmd = b.addRunArtifact(exe);
+    // const run_cmd = b.addRunArtifact(exe);
 
     // By making the run step depend on the install step, it will be run from the
     // installation directory rather than directly from within the cache directory.
     // This is not necessary, however, if the application depends on other installed
     // files, this ensures they will be present and in the expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
+    // run_cmd.step.dependOn(b.getInstallStep());
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    // if (b.args) |args| {
+    //     run_cmd.addArgs(args);
+    // }
 
     // This creates a build step. It will be visible in the `zig build --help` menu,
     // and can be selected like this: `zig build run`
     // This will evaluate the `run` step rather than the default, which is "install".
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    // const run_step = b.step("run", "Run the app");
+    // run_step.dependOn(&run_cmd.step);
 }
 fn build_vsr_module(b: *std.Build, options: struct {
     target: std.Build.ResolvedTarget,
