@@ -1,11 +1,64 @@
 const std = @import("std");
 const config = @import("./libs/tigerbeetle/src/config.zig");
+const builtin = @import("builtin");
+const CrossTarget = std.zig.CrossTarget;
+const Mode = std.builtin.Mode;
 const VoprStateMachine = enum { testing, accounting };
 const VoprLog = enum { short, full };
+fn resolve_target(b: *std.Build, target_requested: ?[]const u8) !std.Build.ResolvedTarget {
+    const target_host = @tagName(builtin.target.cpu.arch) ++ "-" ++ @tagName(builtin.target.os.tag);
+    const target = target_requested orelse target_host;
+    const triples = .{
+        "aarch64-linux",
+        "aarch64-macos",
+        "x86_64-linux",
+        "x86_64-macos",
+        "x86_64-windows",
+    };
+    const cpus = .{
+        "baseline+aes+neon",
+        "baseline+aes+neon",
+        "x86_64_v3+aes",
+        "x86_64_v3+aes",
+        "x86_64_v3+aes",
+    };
+
+    const arch_os, const cpu = inline for (triples, cpus) |triple, cpu| {
+        if (std.mem.eql(u8, target, triple)) break .{ triple, cpu };
+    } else {
+        std.log.err("unsupported target: '{s}'", .{target});
+        return error.UnsupportedTarget;
+    };
+    const query = try CrossTarget.parse(.{
+        .arch_os_abi = arch_os,
+        .cpu_features = cpu,
+    });
+    return b.resolveTargetQuery(query);
+}
+
+const zig_version = std.SemanticVersion{
+    .major = 0,
+    .minor = 13,
+    .patch = 0,
+};
+
+comptime {
+    // Compare versions while allowing different pre/patch metadata.
+    const zig_version_eq = zig_version.major == builtin.zig_version.major and
+        zig_version.minor == builtin.zig_version.minor and
+        zig_version.patch == builtin.zig_version.patch;
+    if (!zig_version_eq) {
+        @compileError(std.fmt.comptimePrint(
+            "unsupported zig version: expected {}, found {}",
+            .{ zig_version, builtin.zig_version },
+        ));
+    }
+}
+
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -42,7 +95,7 @@ pub fn build(b: *std.Build) void {
             []const u8,
             "git-commit",
             "The git commit revision of the source code.",
-        ) orelse std.mem.trimRight(u8, b.run(&.{ "git", "rev-parse", "--verify", "HEAD" }), "\n"),
+        ) orelse "9721f287401a899aa1e46bae78f437c48b521c73",
         .hash_log_mode = b.option(
             config.HashLogMode,
             "hash-log-mode",
@@ -69,7 +122,7 @@ pub fn build(b: *std.Build) void {
             "Build tasks print the path of the executable",
         ) orelse false,
     };
-    const target = b.standardTargetOptions(.{});
+    const target = try resolve_target(b, build_options.target);
 
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
@@ -101,9 +154,9 @@ pub fn build(b: *std.Build) void {
     const vsr_options, const vsr_module = build_vsr_module(b, .{
         .target = target,
         .git_commit = build_options.git_commit[0..40].*,
-        .config_verify = build_options.config_verify,
-        .config_release = build_options.config_release,
-        .config_release_client_min = build_options.config_release_client_min,
+        .config_verify = true,
+        .config_release = "0.16.27",
+        .config_release_client_min = "0.0.1",
         .config_aof_recovery = build_options.config_aof_recovery,
         .hash_log_mode = build_options.hash_log_mode,
     });
@@ -113,7 +166,10 @@ pub fn build(b: *std.Build) void {
     });
     tb.addImport("vsr", vsr_module);
     tb.addOptions("vsr_options", vsr_options);
+
     exe.root_module.addImport("tb", tb);
+    exe.root_module.addImport("vsr", vsr_module);
+    exe.root_module.addOptions("vsr_options", vsr_options);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -161,11 +217,11 @@ fn build_vsr_module(b: *std.Build, options: struct {
     const vsr_options = b.addOptions();
     vsr_options.addOption(?[40]u8, "git_commit", options.git_commit[0..40].*);
     vsr_options.addOption(bool, "config_verify", options.config_verify);
-    vsr_options.addOption(?[]const u8, "release", options.config_release);
+    vsr_options.addOption(?[]const u8, "release", "0.16.27");
     vsr_options.addOption(
         ?[]const u8,
         "release_client_min",
-        options.config_release_client_min,
+        "0.0.1",
     );
     vsr_options.addOption(bool, "config_aof_recovery", options.config_aof_recovery);
     vsr_options.addOption(config.HashLogMode, "hash_log_mode", options.hash_log_mode);
